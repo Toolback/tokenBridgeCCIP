@@ -166,16 +166,20 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator {
           _amount
       );
 
+      // Ensure fees are paid with sent tx
       if (fees > msg.value)
           revert NotEnoughBalanceForFees(msg.value, fees);
+      // Refund if sent amount exceed fees
       uint256 refund = msg.value - fees;
       if (refund > 0) {
         (bool status, ) = payable(_msgSender()).call{ value: refund }('');
         require(status, 'REFUND');
       }
 
+      // Transfer token from sender to bridge
       status = iToken.transferFrom(msg.sender, address(this), _amount);
       if(!status) revert("Cannot transfer tokens to bridge");
+      // Burn token on this chain to mint on destination chain
       status = iToken.burn(_amount);
       if(!status) revert("Cannot burn tokens");
 
@@ -271,13 +275,10 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator {
   function withdraw(address _beneficiary) public onlyOwner {
       // Retrieve the balance of this contract
       uint256 amount = address(this).balance;
-
       // Revert if there is nothing to withdraw
       if (amount == 0) revert NothingToWithdraw();
-
       // Attempt to send the funds, capturing the success status and discarding any return data
       (bool status, ) = _beneficiary.call{value: amount}("");
-
       // Revert if the send failed, with information about the attempted transfer
       if (!status) revert FailedToWithdrawNative(msg.sender, _beneficiary, amount);
   }
@@ -292,10 +293,8 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator {
   ) public onlyOwner {
       // Retrieve the balance of this contract
       uint256 amount = IERC20(_token).balanceOf(address(this));
-
       // Revert if there is nothing to withdraw
       if (amount == 0) revert NothingToWithdraw();
-
       IERC20(_token).safeTransfer(_beneficiary, amount);
   }
 
